@@ -1,3 +1,10 @@
 This files contains instructions on usage of the DuckChat system and the build
 process to compile from src.
 
+Follow the steps immidiately below to build the DuckChat server and client:
+1. use make
+2. run server
+    - use your ip addr (find using ifconfig/ipconfig)
+    - define your own port greater than 1024
+3. run client
+    - use credentials you had determined above
