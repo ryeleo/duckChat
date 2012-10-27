@@ -3,10 +3,14 @@
 #include <string.h>
 #include <netdb.h>
 #include <unistd.h>
+#include <stdlib.h>
+
+#include <arpa/inet.h>
 
 #include <sys/socket.h>
 #include <sys/types.h>
 
+#include "client.h"
 #include "duckchat.h"
 #include "raw.h"
 
@@ -26,13 +30,16 @@ int main(int argc, char *argv[]){
         *port,          // port number on server-end
         *uname,         // username the user requests
 
-        inputBuf[32],   // buffer input from command line
-        inputChar,      // used along with buffer for user input 
-    
-        token1[32],     // used in parsing client requests
-        token2[32],     // used in parsing client requests 
+        inputBuf[SAY_MAX],      // buffer input from command line
+        sayBuf[SAY_MAX],        // buffer to send message to server 
+        inputChar,              // used along with buffer for user input
+        consoleBuf[256],
 
-        activeChannel[32],  // name of channel user is on 
+        delim,          // delim char for tokens    
+        *token1 = malloc(SAY_MAX),     // used in parsing client requests
+        *token2 = malloc(SAY_MAX),     // used in parsing client requests 
+
+        activeChannel[CHANNEL_MAX] = "Common",  // name of channel user is on 
         **channels;     // list of channels user can intera
    
      struct addrinfo 
@@ -43,8 +50,26 @@ int main(int argc, char *argv[]){
     struct request_login 
         packLogin;
     
-    struct 
+    struct request_logout
+        packLogout;
+
+    struct request_join
+        packJoin;
+
+    struct request_leave
+        packLeave;
+
+    struct request_say
+        packSay;
+
+    struct request_list
+        packList;
     
+    struct request_who
+        packWho;
+
+    struct request_keep_alive
+        packKeepAlive;
      
 // (1) Client Initialization
     
@@ -88,6 +113,7 @@ int main(int argc, char *argv[]){
         printf("Could not establish socket. \nIs the server online?\n");
         return 1;
     }
+
    
 // (2) Connect to Server
     
@@ -101,65 +127,177 @@ int main(int argc, char *argv[]){
 
     // initialize user login message
     memset(&packLogin, 0, sizeof(packLogin));
-    packLogin.req_type = REQ_LOGIN;
+    packLogin.req_type = htonl(REQ_LOGIN);
     strncpy(packLogin.req_username, uname, USERNAME_MAX);
 
     // send the login message
-     
     ret = write(sockfd, (char*) &packLogin, sizeof(packLogin));
     if (ret == -1){
         printf("Error occurred at login: %s\n", strerror(errno));
         return 1;
+    }
+
+    // initialize user join message
+    memset(&packJoin, 0, sizeof(packJoin));
+    packJoin.req_type = htonl(REQ_JOIN);
+    strncpy(packJoin.req_channel, activeChannel, strlen(activeChannel));
+
+    // send the join message
+    ret = write(sockfd, (char*) &packJoin, sizeof(packJoin));
+    if (ret == -1){
+        printf("Error occurred during join: %s\n", strerror(errno));
+        return 1; 
     }
     
 // (4, 5, 6) Main event loop
     ret = raw_mode();
     if (ret != 0){
         printf("Issue entering raw mode");
-        return 1;
+        bad_exit();
     }
     while(1){//begin Main event loop
 
 // (4) Get user input
-        memset(inputBuf, '\0', BUFF_SIZE);
+        memset(inputBuf, '\0', SAY_MAX);
+        memset(sayBuf, '\0', SAY_MAX);
         i = 0;
         inputChar = '\0';
         do{
             ret = read(STDIN, &inputChar, CHAR_AMOUNT);    
             if (ret != CHAR_AMOUNT){
                 printf("Error occurred during user input: %s\n", strerror(errno));
-                return 1;
+                bad_exit();
             }
-            if (i >= 31)
+            if (i >= SAY_MAX - 1){ // if have read full amount, wait for \n
                 continue;
-            else{
+            }else if(inputChar == '\n'){
+                break;
+            }else{
                 inputBuf[i] = inputChar;
                 write(STDOUT, &(inputBuf[i]), CHAR_AMOUNT);   
             }
             i++;
         }while(inputChar != '\n');
-
-// (5) Parse user input and send to server
-        token1 = strtok(inputBuffer, ' ');
-        token2 = strtok(NULL, ' ');
-        //TODO: Impliment all commands
-        if(inputBuf[0] == '/' ){ // send command
+        printf("\n"); // newlines absorbed in while loop above   
+        strncpy(sayBuf, inputBuf, strlen(inputBuf));
+    
+// (5, 6) Parse user input and send to server
+        delim = ' ';
+        token1 = strtok(inputBuf, &delim);
+        token2 = strtok(NULL, &delim);
+        
+        if(sayBuf[0] == '/' ){ // send command
             if(strcmp("/exit", token1) == 0){
-            }else if(strcmp("/join", token1)){ //check token 2
-            }else if(strcmp("/leave", token1)){ //check token 2
-            }else if(strcmp("/list", token1)){
-            }else if(strcmp("/who", token1)){ // check token 2
-            }else if(strcmp("/switch", token1)){ // check token 2
+
+                // initialize user logout message
+                memset(&packLogout, 0, sizeof(packLogout));
+                packLogout.req_type = htonl(REQ_LOGOUT);
+
+                // send the logout message
+                ret = write(sockfd, (char*) &packLogout, sizeof(packLogout));
+                if (ret == -1){
+                    printf("Error occurred during exit: %s\n", strerror(errno));
+                    bad_exit();
+                }
+                
+                clean_exit(); // user logout
+                
+            }else if(strcmp("/join", token1) == 0){ //check token 2
+            
+                // initialize user join message
+                memset(&packJoin, 0, sizeof(packJoin));
+                packJoin.req_type = htonl(REQ_JOIN);
+                strncpy(packJoin.req_channel, token2, strlen(token2));
+
+                // send the join message
+                ret = write(sockfd, (char*) &packJoin, sizeof(packJoin));
+                if (ret == -1){
+                    printf("Error occurred during join: %s\n", strerror(errno));
+                    bad_exit();
+                }
+
+            }else if(strcmp("/leave", token1) == 0){ //check token 2
+            
+                // initialize user leave message
+                memset(&packLeave, 0, sizeof(packLeave));
+                packLeave.req_type = htonl(REQ_LEAVE);
+                strncpy(packLeave.req_channel, token2, strlen(token2));
+
+                // send the leave message
+                ret = write(sockfd, (char*) &packLeave, sizeof(packLeave));
+                if (ret == -1){
+                    printf("Error occurred during leave: %s\n", strerror(errno));
+                    bad_exit();
+                }
+     
+            }else if(strcmp("/list", token1) == 0){
+            
+                // initialize user list message
+                memset(&packList, 0, sizeof(packList));
+                packList.req_type = htonl(REQ_LIST);
+
+                // send the list message
+                ret = write(sockfd, (char*) &packList, sizeof(packList));
+                if (ret == -1){
+                    printf("Error occurred during list: %s\n", strerror(errno));
+                    bad_exit();
+                }
+            
+            }else if(strcmp("/who", token1) == 0){ // check token 2
+
+                // initialize user who message
+                memset(&packWho, 0, sizeof(packWho));
+                packWho.req_type = htonl(REQ_WHO);
+                strncpy(packWho.req_channel, token2, strlen(token2));
+
+                // send the who message
+                ret = write(sockfd, (char*) &packWho, sizeof(packWho));
+                if (ret == -1){
+                    printf("Error occurred during who: %s\n", strerror(errno));
+                    bad_exit();
+                }
+    
+            }else if(strcmp("/switch", token1) == 0){ // check token 2
+  
+                strncpy(activeChannel, token2, CHANNEL_MAX); 
+
             }else{ //wrong
+                printf("*Unkown command\n"); 
             }
         }else{ // say
-            //XXX: Impliment say
+            
+            // initialize user message
+            memset(&packSay, 0, sizeof(packSay));
+            packSay.req_type = htonl(REQ_SAY);
+            strncpy(packSay.req_channel, activeChannel, strlen(activeChannel));
+            strncpy(packSay.req_text, sayBuf, strlen(sayBuf));
+
+            // send the message
+            ret = write(sockfd, (char*) &packSay, sizeof(packSay));
+            if (ret == -1){
+                printf("Error occurred during say: %s\n", strerror(errno));
+                bad_exit();
+            }
+
         }
-// (6) Send the request to the server
+
+        //TODO: HC
+        ret = read(sockfd, consoleBuf, 256); 
+        if (ret == -1){
+            printf("Error occurred during read from server: %s\n", strerror(errno));
+            bad_exit();
+        }
+        printf("%s\n", consoleBuf);
 
     }//end Main event loop
-    cooked_mode();  
 }
 
-char *parse(char *input){
+void clean_exit(){
+    cooked_mode();
+    exit(0);
+}
+
+void bad_exit(){
+    cooked_mode();
+    exit(1);
 }
