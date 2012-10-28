@@ -12,14 +12,16 @@
  * will fall exactly where specified. */
 #define packed __attribute__((packed))
 
-/* Define the length limits */
-#define USERNAME_MAX 32
-#define CHANNEL_MAX 32
-#define SAY_MAX 64
-
 /* Define some types for designating request and text codes */
 typedef int request_t;
 typedef int text_t;
+
+/* Define the length limits */
+#define MAX
+#define USERNAME_MAX 32
+#define CHANNEL_MAX 32
+#define SAY_MAX 64
+#define MESSAGE_MAX sizeof(request_t) + USERNAME_MAX + SAY_MAX
 
 /* Define codes for request types.  These are the messages sent to the server. */
 #define REQ_LOGIN 0
@@ -38,51 +40,51 @@ typedef int text_t;
 #define TXT_ERROR 3
 
 /* This structure is used for a generic request type, to the server. */
-struct request {
+typedef struct __attribute__((__packed__)) request {
         request_t req_type;
-} packed;
+} request;
 
 /* Once we've looked at req_type, we then cast the pointer to one of
  * the types below to look deeper into the structure.  Each of these
  * corresponds with one of the REQ_ codes above. */
 
-struct request_login {
+typedef struct __attribute__((__packed__)) request_login {
         request_t req_type; /* = REQ_LOGIN */
         char req_username[USERNAME_MAX];
-} packed;
+} request_login;
 
-struct request_logout {
+typedef struct __attribute__((__packed__)) request_logout {
         request_t req_type; /* = REQ_LOGOUT */
-} packed;
+} request_logout;
 
-struct request_join {
+typedef struct __attribute__((__packed__)) request_join {
         request_t req_type; /* = REQ_JOIN */
         char req_channel[CHANNEL_MAX]; 
-} packed;
+} request_join;
 
-struct request_leave {
+typedef struct __attribute__((__packed__)) request_leave {
         request_t req_type; /* = REQ_LEAVE */
         char req_channel[CHANNEL_MAX]; 
-} packed;
+} request_leave;
 
-struct request_say {
+typedef struct __attribute__((__packed__)) request_say {
         request_t req_type; /* = REQ_SAY */
         char req_channel[CHANNEL_MAX]; 
         char req_text[SAY_MAX];
-} packed;
+} request_say;
 
-struct request_list {
+typedef struct __attribute__((__packed__)) request_list {
         request_t req_type; /* = REQ_LIST */
-} packed;
+} request_list;
 
-struct request_who {
+typedef struct __attribute__((__packed__)) request_who {
         request_t req_type; /* = REQ_WHO */
         char req_channel[CHANNEL_MAX]; 
-} packed;
+} request_who;
 
-struct request_keep_alive {
+typedef struct __attribute__((__packed__)) request_keep_alive {
         request_t req_type; /* = REQ_KEEP_ALIVE */
-} packed;
+} request_keep_alive;
 
 /* This structure is used for a generic text type, to the client. */
 struct text {

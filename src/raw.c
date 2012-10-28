@@ -5,11 +5,14 @@
 /* See raw.h for usage information */
 
 static struct termios oldterm;
+int flag = 0; // flag to indicate that we have entered raw mode
 
 /* Returns -1 on error, 0 on success */
 int raw_mode (void)
 {
         struct termios term;
+
+        flag = 1;    
 
         if (tcgetattr(STDIN_FILENO, &term) != 0) return -1;
     
@@ -24,6 +27,8 @@ int raw_mode (void)
 }
 
 void cooked_mode (void)    
-{   
+{
+    if (flag == 1) 
         tcsetattr(STDIN_FILENO, TCSANOW, &oldterm);
+    
 }
