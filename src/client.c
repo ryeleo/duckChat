@@ -41,10 +41,10 @@ int main(int argc, char *argv[]){
         *token1 = malloc(SAY_MAX),      // used in parsing client requests
         *token2 = malloc(SAY_MAX),      // used in parsing client requests 
 
-        activeChannel[CHANNEL_MAX] = "Common",  // name of channel user is on 
-        *channels[] = ;     // list of channels user can intera
+        activeChannel[CHANNEL_MAX] = "Common";  // name of channel user is on 
+        //*channels[] = ;     // list of channels user can intera
    
-     struct addrinfo 
+    struct addrinfo 
         hints,          // used to define what type of socket the client needs
         *serv,          // used to hold socket-descr that the server has offered us to use
         *servIter;      // used to iterate through the socket-descr the server has offered us to use
@@ -54,6 +54,10 @@ int main(int argc, char *argv[]){
         printf("Error occurred durring malloc");
         bad_exit();
     }
+    
+    fd_set 
+        read_fdset;
+
 // (1) Client Initialization
     
     // verfiy input params 
@@ -105,11 +109,11 @@ int main(int argc, char *argv[]){
         printf("Could not establish socket. \nIs the server online?\n");
         bad_exit();
     }
-   
+    serv = servIter;
 // (2) Connect to Server
     
     // make a UPD connect request
-    ret = connect(sockfd, servIter->ai_addr, servIter->ai_addrlen);
+    ret = connect(sockfd, serv->ai_addr, serv->ai_addrlen);
     if (ret == -1){
         printf("Could not connect to server: %s\n", strerror(errno));
         bad_exit();
@@ -147,7 +151,7 @@ int main(int argc, char *argv[]){
 
     // initialize our channels
     activeChannel_index = 0;
-    channels[activeChannel_index] = malloc(strnlen(activeChannel, CHANNEL_MAX));
+   //channels[activeChannel_index] = malloc(strnlen(activeChannel, CHANNEL_MAX));
 
 // (4, 5, 6) Main event loop
 
@@ -164,22 +168,58 @@ int main(int argc, char *argv[]){
         memset(sayBuf, '\0', SAY_MAX);
         i = 0;
         inputChar = '\0';
-        do{
-            ret = read(STDIN, &inputChar, CHAR_AMOUNT);    
-            if (ret != CHAR_AMOUNT){
-                printf("Error occurred during user input: %s\n", strerror(errno));
-                bad_exit();
-            }
-            if (i >= SAY_MAX - 1){ // if have read full amount, wait for \n
-                continue;
-            }else if(inputChar == '\n'){
-                break;
+
+
+        // main loop to collect user input and server messages
+	while(1){
+	   
+           
+            // setup for call to select
+            FD_ZERO(&read_fdset);
+            FD_SET(STDIN, &read_fdset);
+            FD_SET(sockfd, &read_fdset);
+    
+            ret = select(sockfd+1, &read_fdset, NULL, NULL, NULL);
+	    // read from server
+            if( i == 0 && FD_ISSET(sockfd, &read_fdset)){
+	        ret = recvfrom(sockfd, consoleBuf, 256, 0, (serv->ai_addr), &(serv->ai_addrlen)); 
+                if (ret == -1){
+                    printf("Error occurred during read from server: %s\n", strerror(errno));
+                    bad_exit();
+	        }
+           	(consolBuf, consolBuf); 
+                printf("%s\n", consoleBuf);
+	
+            // read from stdin
+            }else if(FD_ISSET(STDIN, &read_fdset)){
+    
+                ret = read(STDIN, &inputChar, CHAR_AMOUNT);    
+                if (ret != CHAR_AMOUNT){
+                    printf("Error occurred during user input: %s\n", strerror(errno));
+                    bad_exit();
+                }
+
+                if (i >= SAY_MAX - 1){ // if have read full amount, wait for \n
+                    continue;
+
+                }else if(inputChar == '\n'){
+                    break;
+
+                }else{
+                    inputBuf[i] = inputChar;
+                    write(STDOUT, &(inputBuf[i]), CHAR_AMOUNT);
+                    i++;
+                }
+
+	    // default case	
             }else{
-                inputBuf[i] = inputChar;
-                write(STDOUT, &(inputBuf[i]), CHAR_AMOUNT);   
-            }
-            i++;
-        }while(inputChar != '\n');
+                if (ret == -1){
+                    perror("Error during select");
+                    bad_exit();
+                }
+	    }
+	}
+        
         printf("\n"); // newlines absorbed in while loop above   
         strncpy(sayBuf, inputBuf, strnlen(inputBuf, SAY_MAX));
     
@@ -216,7 +256,7 @@ int main(int argc, char *argv[]){
                     bad_exit();
                 }
     
-                channel[]
+                //channel[]
 
             }else if(strcmp("/leave", token1) == 0){ //check token 2
 
@@ -253,18 +293,19 @@ int main(int argc, char *argv[]){
                     bad_exit();
                 }
 
-            }else if(strcmp("/switch", token1) == 0){ // check token 2
+/*            }else if(strcmp("/switch", token1) == 0){ // check token 2
  
                 // check the channel parameter
                 if (token2 == NULL)            
                     goto UNKOWN_COMMAND;
    
                 while(strncmp(activeChannel, channels[])){
-                }
+           	
+		}
      
                 // modify our local activeChannel to be the one requested 
                 strncpy(activeChannel, token2, CHANNEL_MAX); 
-
+*/
             }else{ //wrong
                 
                 UNKOWN_COMMAND:
@@ -272,8 +313,8 @@ int main(int argc, char *argv[]){
                 printf("*Unkown command\n"); 
 
             }
+
         }else{ // implies say message
-           
                 
             // pack the message for say
             ret = packRequest(message, REQ_SAY, activeChannel, sayBuf, NULL);
@@ -292,20 +333,19 @@ int main(int argc, char *argv[]){
             bad_exit();
         }
 
-// (7) Check buffer for incoming messages from server
-/*
-        ret = read(sockfd, consoleBuf, 256); 
-        if (ret == -1){
-            printf("Error occurred during read from server: %s\n", strerror(errno));
-            bad_exit();
-        }
-        printf("%s\n", consoleBuf);
-*/
+
     }//end Main event loop
 
     // should never get here    
     bad_exit();
 
+}
+
+int parseServer(char *dest, char *input){
+	
+	text_say say = (text_say) input;
+	sscanf(dest, "[%s][%s]: %s", say.txt_channel, say.txt_username, say.txt_text);
+	return 0;
 }
 
 int packRequest(struct request *message, request_t req_type, char *channel, char *say, char *uname){

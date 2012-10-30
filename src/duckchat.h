@@ -95,39 +95,39 @@ struct text {
  * the types below to look deeper into the structure.  Each of these
  * corresponds with one of the TXT_ codes above. */
 
-struct text_say {
+typedef struct __attribute__((__packed__)) text_say {
         text_t txt_type; /* = TXT_SAY */
         char txt_channel[CHANNEL_MAX];
         char txt_username[USERNAME_MAX];
         char txt_text[SAY_MAX];
-} packed;
+} text_say;
 
 /* This is a substructure used by struct text_list. */
-struct channel_info {
+struct __attribute__((__packed__)) channel_info {
         char ch_channel[CHANNEL_MAX];
-} packed;
+} channel_info;
 
-struct text_list {
+struct __attribute__((__packed__)) text_list {
         text_t txt_type; /* = TXT_LIST */
         int txt_nchannels;
         struct channel_info txt_channels[0]; // May actually be more than 0
-} packed;
+} text_list;
 
 /* This is a substructure used by text_who. */
-struct user_info {
+struct __attribute__((__packed__)) user_info {
         char us_username[USERNAME_MAX];
-};
+} user_info;
 
-struct text_who {
+struct __attribute__((__packed__)) text_who {
         text_t txt_type; /* = TXT_WHO */
         int txt_nusernames;
         char txt_channel[CHANNEL_MAX]; // The channel requested
         struct user_info txt_users[0]; // May actually be more than 0
-} packed;
+} text_who;
 
-struct text_error {
+struct __attribute__((__packed__)) text_error {
         text_t txt_type; /* = TXT_ERROR */
         char txt_error[SAY_MAX]; // Error message
-};
+} text_error;
 
 #endif
