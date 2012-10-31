@@ -11,11 +11,10 @@ int packRequest(struct request *message,
                 char *say, 
                 char *uname);
 
-//Be sure errno is set upon return w/ -1!!!
 int sendRequest(int fd, struct request *message);
 
 void bad_exit();
-void clean_exit();
 
+void clean_exit();
 
 #endif

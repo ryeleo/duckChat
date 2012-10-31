@@ -17,7 +17,8 @@ typedef int request_t;
 typedef int text_t;
 
 /* Define the length limits */
-#define MAX
+#define CHANNEL_COUNT 4096
+#define TEXT_MAX 4096 
 #define USERNAME_MAX 32
 #define CHANNEL_MAX 32
 #define SAY_MAX 64

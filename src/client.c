@@ -24,7 +24,7 @@ int main(int argc, char *argv[]){
     int ret,            // general return variable 
         i,              // general counter
         sockfd,         // file descriptor for client socket
-        activeChannel_index;    // this is the index that points to the current active channel in **channels 
+        activeChannelIndex = 1;     // index set to 1 for 'Common' channel
     
     char 
         *server,        // domain name of the server the client will connect to
@@ -34,15 +34,25 @@ int main(int argc, char *argv[]){
         inputBuf[SAY_MAX],      // buffer input from command line
         sayBuf[SAY_MAX],        // buffer to send message to server 
         inputChar,              // used along with buffer for user input
-        consoleBuf[256],
+        consoleBuf[TEXT_MAX],
 
-        //TODO: check return of malloc
-        delim,                          // delim char for tokens    
-        *token1 = malloc(SAY_MAX),      // used in parsing client requests
-        *token2 = malloc(SAY_MAX),      // used in parsing client requests 
+        
 
-        activeChannel[CHANNEL_MAX] = "Common";  // name of channel user is on 
-        //*channels[] = ;     // list of channels user can intera
+        activeChannel[CHANNEL_MAX] = "Common",  // name of channel user is on 
+        channels[CHANNEL_COUNT][CHANNEL_MAX],   // list of channels user can interact with
+        
+        *token1 = malloc(SAY_MAX),              // used in parsing client requests
+        *token2 = malloc(SAY_MAX);              // used in parsing client requests 
+    
+        // check that our malloc succeeded
+        if (token2 == NULL || token1 == NULL){
+            printf("Issue allocating space for tokens");
+            bad_exit();
+        }
+        
+        memset(channels, 0, CHANNEL_COUNT*CHANNEL_MAX); // initialize channels
+        strncpy(channels[0], activeChannel, CHANNEL_MAX); // add 'Common' to channels
+        
    
     struct addrinfo 
         hints,          // used to define what type of socket the client needs
@@ -110,6 +120,7 @@ int main(int argc, char *argv[]){
         bad_exit();
     }
     serv = servIter;
+
 // (2) Connect to Server
     
     // make a UPD connect request
@@ -149,10 +160,6 @@ int main(int argc, char *argv[]){
         bad_exit();
     }
 
-    // initialize our channels
-    activeChannel_index = 0;
-   //channels[activeChannel_index] = malloc(strnlen(activeChannel, CHANNEL_MAX));
-
 // (4, 5, 6) Main event loop
 
     ret = raw_mode();
@@ -171,8 +178,7 @@ int main(int argc, char *argv[]){
 
 
         // main loop to collect user input and server messages
-	while(1){
-	   
+	    while(1){
            
             // setup for call to select
             FD_ZERO(&read_fdset);
@@ -180,15 +186,21 @@ int main(int argc, char *argv[]){
             FD_SET(sockfd, &read_fdset);
     
             ret = select(sockfd+1, &read_fdset, NULL, NULL, NULL);
-	    // read from server
+	        
+            // read from server
             if( i == 0 && FD_ISSET(sockfd, &read_fdset)){
-	        ret = recvfrom(sockfd, consoleBuf, 256, 0, (serv->ai_addr), &(serv->ai_addrlen)); 
-                if (ret == -1){
+	        ret = recvfrom(sockfd, consoleBuf, TEXT_MAX, 0, (serv->ai_addr), &(serv->ai_addrlen)); 
+            if (ret == -1){
                     printf("Error occurred during read from server: %s\n", strerror(errno));
                     bad_exit();
 	        }
-           	parseServer(consoleBuf);
-	
+           	ret = parseServer(consoleBuf);
+#ifdef DEBUG
+            if (ret == -1){
+                printf("Server sent nonstandard message\n");
+            }
+#endif /* DEBUG */
+
             // read from stdin
             }else if(FD_ISSET(STDIN, &read_fdset)){
     
@@ -210,23 +222,26 @@ int main(int argc, char *argv[]){
                     i++;
                 }
 
-	    // default case	
+	        // default case	
             }else{
                 if (ret == -1){
                     perror("Error during select");
                     bad_exit();
                 }
-	    }
-	}
+	        }
+	    }   
         
         printf("\n"); // newlines absorbed in while loop above   
         strncpy(sayBuf, inputBuf, strnlen(inputBuf, SAY_MAX));
     
 // (5) Parse user input
 
-        delim = ' ';
-        token1 = strtok(inputBuf, &delim);
-        token2 = strtok(NULL, &delim);
+        token1 = strtok(inputBuf, " ");
+        token2 = strtok(NULL, "");
+
+        // if we are given a channel, make sure it is not too long
+        if(token2 != NULL)
+            token2[CHANNEL_MAX-1]='\0';
         
         if(sayBuf[0] == '/' ){ // implies command
             
@@ -246,8 +261,30 @@ int main(int argc, char *argv[]){
     
                 // check the channel parameter
                 if (token2 == NULL)            
-                    goto UNKOWN_COMMAND;
-
+                    goto UNKNOWN_COMMAND;
+                
+                // run through our stack to make sure we have not already
+                // added the channel 'token2'
+                for( i=0 ; i < activeChannelIndex ; i++){
+                    if( strcmp(token2, channels[i]) == 0 ){
+                        // have this channel already
+                        break;
+                    }
+                }
+                    
+                // resulting from the previous check, we know that we have 
+                // not yet seen this in our stack
+                if( strcmp(token2, channels[i]) != 0 ){
+                    // bound check on our active channels
+                    if (activeChannelIndex >= CHANNEL_COUNT){
+                        printf("You have joined the maximum allowed number of channels: %d", CHANNEL_COUNT);
+                        continue;
+                    }
+                    // add the channel requested to our channels array
+                    strncpy( channels[activeChannelIndex], token2, CHANNEL_MAX);
+                    activeChannelIndex++;
+                }
+                
                 // pack the message for join
                 ret = packRequest(message, REQ_JOIN, token2, NULL, NULL);
                 if (ret == -1){
@@ -255,13 +292,29 @@ int main(int argc, char *argv[]){
                     bad_exit();
                 }
     
-                //channel[]
-
-            }else if(strcmp("/leave", token1) == 0){ //check token 2
+            }else if(strcmp("/leave", token1) == 0){ // uses token 2
 
                 // check the channel parameter
                 if (token2 == NULL)            
-                    goto UNKOWN_COMMAND;
+                    goto UNKNOWN_COMMAND;
+                
+                // see if we are leaving the active channel
+                if (strcmp(activeChannel, token2) == 0)
+                    memset(activeChannel, 0, CHANNEL_MAX);
+    
+                // step through our stack of channels to see if the one
+                // the user asked to leave exists 
+                for( i=0 ; i < activeChannelIndex ; i++){
+                    // if the channel does exist in our channels array
+                    if( strcmp(token2, channels[i]) == 0 ){
+                        // swap the last item on the stack with the one that needs
+                        // to be removed, then remove the bottom item
+                        strncpy(channels[i], channels[activeChannelIndex-1], CHANNEL_MAX);
+                        memset(channels[activeChannelIndex-1], 0, CHANNEL_MAX);
+                        activeChannelIndex--;
+                        break;
+                    }
+                }
     
                 // pack the message for leave
                 ret = packRequest(message, REQ_LEAVE, token2, NULL, NULL);
@@ -283,7 +336,7 @@ int main(int argc, char *argv[]){
 
                 // check the channel parameter
                 if (token2 == NULL)            
-                    goto UNKOWN_COMMAND;
+                    goto UNKNOWN_COMMAND;
     
                 // pack the message for who
                 ret = packRequest(message, REQ_WHO, token2, NULL, NULL);
@@ -292,30 +345,44 @@ int main(int argc, char *argv[]){
                     bad_exit();
                 }
 
-/*            }else if(strcmp("/switch", token1) == 0){ // check token 2
+            }else if(strcmp("/switch", token1) == 0){ // check token 2
  
                 // check the channel parameter
                 if (token2 == NULL)            
-                    goto UNKOWN_COMMAND;
+                    goto UNKNOWN_COMMAND;
    
-                while(strncmp(activeChannel, channels[])){
-           	
-		}
-     
-                // modify our local activeChannel to be the one requested 
-                strncpy(activeChannel, token2, CHANNEL_MAX); 
-*/
+                // checks through
+                for( i=0 ; i < activeChannelIndex ; i++){
+                    if( strcmp(token2, channels[i]) == 0 ){
+                        // modify our local activeChannel to be the one requested 
+                        strncpy(activeChannel, token2, CHANNEL_MAX);
+                        break;
+                    }
+                }
+    
+                // let the user know the result of the switch 
+                if (strcmp(token2, activeChannel) != 0)
+                    printf("You have not subscribed to the channel %s\n", token2);
+                
+                // do not pack a request to send so continue
+                continue;
+
             }else{ //wrong
                 
-                UNKOWN_COMMAND:
+                UNKNOWN_COMMAND:
                 // inform the client user the command is not valid
                 printf("*Unkown command\n"); 
-
+        
+                // do not pack a request to send so continue
+                continue;
             }
 
         }else{ // implies say message
-                
-            // pack the message for say
+               
+            // make sure we are not trying to send to a nonexistant channel
+            if (strcmp(activeChannel, "") == 0)
+               continue;
+            
             ret = packRequest(message, REQ_SAY, activeChannel, sayBuf, NULL);
             if (ret == -1){
                 printf("Error from packRequest\n");
@@ -336,6 +403,9 @@ int main(int argc, char *argv[]){
     }//end Main event loop
 
     // should never get here    
+    free(token1);
+    free(token2);
+    free(message);
     bad_exit();
 
 }
@@ -347,33 +417,30 @@ int parseServer(char *package){
     switch (txt_type){
         
         case TXT_SAY:
-            printf("[%s][%s]: %s\n",((text_say*)package)-> txt_channel,
-            ((text_say*)package)-> txt_username,
-	    ((text_say*)package)-> txt_text);
-	    break;             
+            printf("[%s][%s]: %s\n",
+                ((text_say*)package)-> txt_channel,
+                ((text_say*)package)-> txt_username,
+	            ((text_say*)package)-> txt_text);
+	        break;             
  
         case TXT_LIST:
             printf("Existing channels:\n");
-	    
-            for(i=0; i<ntohl(((text_list*)package)->txt_nchannels); i++){
-	        printf("  %s\n", ( (((text_list*)package)->txt_channels)[i]).ch_channel);
-	    } 
+            for(i=0; i<ntohl(((text_list*)package)->txt_nchannels); i++)
+	            printf("  %s\n", ( (((text_list*)package)->txt_channels)[i]).ch_channel);
             break;
         
         case TXT_WHO:
             printf("Users on channel %s:\n", ((text_who*)package)->txt_channel);
-	    
-            for(i=0; i<ntohl(((text_who*)package)->txt_nusernames); i++){
-	        printf("  %s\n", ( (((text_who*)package)->txt_users)[i]).us_username);
-	    }
-	    break;
+            for(i=0; i<ntohl(((text_who*)package)->txt_nusernames); i++)
+	            printf("  %s\n", ( (((text_who*)package)->txt_users)[i]).us_username);
+	        break;
 
         case TXT_ERROR:
             printf("[ERROR]: %s\n",((text_error*)package)-> txt_error);
-	    break;
+	        break;
         
         default:
-            // should literally NEVER get here
+            // server may send a bogus packet
             return -1;
     }
     return 0;
