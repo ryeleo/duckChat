@@ -167,6 +167,11 @@ int main(int argc, char *argv[]){
         printf("Issue entering raw mode");
         bad_exit();
     }
+
+    // promt the user for input
+    printf(">");
+    fflush(NULL); 
+ 
     while(1){//begin Main event loop
 
 // (4) Get user input
@@ -176,10 +181,10 @@ int main(int argc, char *argv[]){
         i = 0;
         inputChar = '\0';
 
-
         // main loop to collect user input and server messages
 	    while(1){
-           
+        
+         
             // setup for call to select
             FD_ZERO(&read_fdset);
             FD_SET(STDIN, &read_fdset);
@@ -200,6 +205,10 @@ int main(int argc, char *argv[]){
                 printf("Server sent nonstandard message\n");
             }
 #endif /* DEBUG */
+            
+            // promt the user for input
+            printf(">");
+            fflush(NULL);  
 
             // read from stdin
             }else if(FD_ISSET(STDIN, &read_fdset)){
