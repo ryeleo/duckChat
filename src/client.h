@@ -3,6 +3,8 @@
 
 #include "duckchat.h"
 
+int parseServer(char *package);
+
 int packRequest(struct request *message, 
                 request_t req_type, 
                 char *channel, 

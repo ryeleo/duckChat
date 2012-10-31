@@ -187,8 +187,7 @@ int main(int argc, char *argv[]){
                     printf("Error occurred during read from server: %s\n", strerror(errno));
                     bad_exit();
 	        }
-           	(consolBuf, consolBuf); 
-                printf("%s\n", consoleBuf);
+           	parseServer(consoleBuf);
 	
             // read from stdin
             }else if(FD_ISSET(STDIN, &read_fdset)){
@@ -341,11 +340,43 @@ int main(int argc, char *argv[]){
 
 }
 
-int parseServer(char *dest, char *input){
-	
-	text_say say = (text_say) input;
-	sscanf(dest, "[%s][%s]: %s", say.txt_channel, say.txt_username, say.txt_text);
-	return 0;
+int parseServer(char *package){
+    unsigned int i;
+    int txt_type = ntohl(((text*)package) -> txt_type);
+    
+    switch (txt_type){
+        
+        case TXT_SAY:
+            printf("[%s][%s]: %s\n",((text_say*)package)-> txt_channel,
+            ((text_say*)package)-> txt_username,
+	    ((text_say*)package)-> txt_text);
+	    break;             
+ 
+        case TXT_LIST:
+            printf("Existing channels:\n");
+	    
+            for(i=0; i<ntohl(((text_list*)package)->txt_nchannels); i++){
+	        printf("  %s\n", ( (((text_list*)package)->txt_channels)[i]).ch_channel);
+	    } 
+            break;
+        
+        case TXT_WHO:
+            printf("Users on channel %s:\n", ((text_who*)package)->txt_channel);
+	    
+            for(i=0; i<ntohl(((text_who*)package)->txt_nusernames); i++){
+	        printf("  %s\n", ( (((text_who*)package)->txt_users)[i]).us_username);
+	    }
+	    break;
+
+        case TXT_ERROR:
+            printf("[ERROR]: %s\n",((text_error*)package)-> txt_error);
+	    break;
+        
+        default:
+            // should literally NEVER get here
+            return -1;
+    }
+    return 0;
 }
 
 int packRequest(struct request *message, request_t req_type, char *channel, char *say, char *uname){

@@ -87,9 +87,9 @@ typedef struct __attribute__((__packed__)) request_keep_alive {
 } request_keep_alive;
 
 /* This structure is used for a generic text type, to the client. */
-struct text {
+typedef struct __attribute__((__packed__)) text {
         text_t txt_type;
-} packed;
+} text;
 
 /* Once we've looked at txt_type, we then cast the pointer to one of
  * the types below to look deeper into the structure.  Each of these
@@ -107,25 +107,25 @@ struct __attribute__((__packed__)) channel_info {
         char ch_channel[CHANNEL_MAX];
 } channel_info;
 
-struct __attribute__((__packed__)) text_list {
+typedef struct __attribute__((__packed__)) text_list {
         text_t txt_type; /* = TXT_LIST */
         int txt_nchannels;
         struct channel_info txt_channels[0]; // May actually be more than 0
 } text_list;
 
 /* This is a substructure used by text_who. */
-struct __attribute__((__packed__)) user_info {
+typedef struct __attribute__((__packed__)) user_info {
         char us_username[USERNAME_MAX];
 } user_info;
 
-struct __attribute__((__packed__)) text_who {
+typedef struct __attribute__((__packed__)) text_who {
         text_t txt_type; /* = TXT_WHO */
         int txt_nusernames;
         char txt_channel[CHANNEL_MAX]; // The channel requested
         struct user_info txt_users[0]; // May actually be more than 0
 } text_who;
 
-struct __attribute__((__packed__)) text_error {
+typedef struct __attribute__((__packed__)) text_error {
         text_t txt_type; /* = TXT_ERROR */
         char txt_error[SAY_MAX]; // Error message
 } text_error;
