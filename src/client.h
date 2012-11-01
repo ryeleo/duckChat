@@ -11,7 +11,7 @@ int packRequest(struct request *message,
                 char *say, 
                 char *uname);
 
-int sendRequest(int fd, struct request *message);
+int sendRequest(int fd, struct addrinfo *serv, struct request *message);
 
 void bad_exit();
 
