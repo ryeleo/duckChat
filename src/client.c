@@ -194,11 +194,12 @@ int main(int argc, char *argv[]){
 	        
             // read from server
             if( i == 0 && FD_ISSET(sockfd, &read_fdset)){
-	        ret = recvfrom(sockfd, consoleBuf, TEXT_MAX, 0, (serv->ai_addr), &(serv->ai_addrlen)); 
+	        ret = recvfrom(sockfd, consoleBuf, TEXT_MAX, 0, (serv->ai_addr), &(serv->ai_addrlen));
             if (ret == -1){
                     printf("Error occurred during read from server: %s\n", strerror(errno));
                     bad_exit();
 	        }
+            printf("\r");
            	ret = parseServer(consoleBuf);
 #ifdef DEBUG
             if (ret == -1){
@@ -207,7 +208,7 @@ int main(int argc, char *argv[]){
 #endif /* DEBUG */
             
             // promt the user for input
-            printf(">");
+            printf("\r>%s",inputBuf);
             fflush(NULL);  
 
             // read from stdin
@@ -227,7 +228,8 @@ int main(int argc, char *argv[]){
 
                 }else{
                     inputBuf[i] = inputChar;
-                    write(STDOUT, &(inputBuf[i]), CHAR_AMOUNT);
+                    printf("\r>%s",inputBuf);
+                    fflush(NULL);
                     i++;
                 }
 
