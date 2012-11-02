@@ -3,7 +3,7 @@ CPP=g++
 PROJ_DIR=..
 CFLAGS= -Wall -W -g
 
-LOADLIBES= -lnsl -lsocket -lresolv
+LOADLIBES= -lnsl #-lsocket -lresolv
 
 all: client server
 

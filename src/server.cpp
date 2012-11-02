@@ -16,9 +16,11 @@
 
 // c++ includes
 
+#include <string>
 #include <iostream>
 #include <map>
 #include <cstring>
+#include <list>
 
 using namespace std;
 
@@ -32,21 +34,41 @@ int main(int argc, char **argv){
     
     char 
         *domain,
-        *port;
+        *port,
+        buf[TEXT_MAX];
 
     struct addrinfo
         hints,
         *serv,
-        *servIter
+        *servIter,
         clientAddrInfo;
     
-    struct sockaddr_storage
-        client;
+    struct sockaddr
+        *client_SA;
+    
+    string
+        client_STR;
+       
+    string
+        username,
+        channel;
+
+    request
+        *message;
 
 //initialize maps for users and channels
-    map<string, list<struck sockaddr_storage> > chanMap;   // map from channel names to lists of addresses of the joined clients
-    map<struct sockaddr_storage, string>        userMap;   // map from address information of a client to their username
-    
+    pair<string, list<string> >    chanMapItem;
+    map<string, list<string> >                 chanMap;   // map from channel names to lists of addresses of the joined clients
+    map<string, list<string> >::iterator       chanMapIt; 
+    pair<map<string, list<string> >::iterator, bool> chanMapRet;
+
+    pair<string, string>                       userMapItem;
+    map<string, string>                        userMap;   // map from address information of a client to their username
+    map<string, string>::iterator              userMapIt;    
+    pair<map<string, string>::iterator, bool>  userMapRet; 
+
+    list<string> userAddrList;
+
 // (1) Check usage
 
     // make sure we have a domain and port
@@ -116,48 +138,104 @@ int main(int argc, char **argv){
     while(1){
 
         //listen on the udp port
-        recvfrom(sockfd, buf, MAXBUFLEN-1 , 0, (struct sockaddr*) &clientAddrInfo.ai_addr, &clientAddrInfo.ai_addrlen);
-        
-        // verify that they are using the correct IPV type
-        if(serv->ai_addrlen != clientAddrInfo.ai_addrlen){
-            printf("[ERROR: %d] User using incorrect IPV type\n", __LINE__);   
-            return -1;
-        }
+        ret = recvfrom(sockfd, buf, TEXT_MAX, 0, (struct sockaddr*) &clientAddrInfo.ai_addr, &clientAddrInfo.ai_addrlen);
+        //TODO ERROR CHECK
 
-        // set up the 'address' (sockaddr_storage) to be associated with a user
-        if(serv->ai_family == AF_INET){ //ipv4
-            ((struct sockaddr_in) client).sin_family = AF_INET;
-        } else { //ipv6
-            ((struct sockaddr_in6) client)
-        }
+        // copy stuff for readability
+        message = (request*) buf;
+        client_SA = clientAddrInfo.ai_addr;
+        client_STR = string( (char*) clientAddrInfo.ai_addr);
+        req_type = ntohl(message->req_type);
         
         switch (req_type){
+    
+            // add user to userMap
             case REQ_LOGIN:
-                //parse the login request
-                //
+                // setup our userMapItem with the username
+                username = string(((request_login*) buf)->req_username);
+                userMapItem.first = client_STR;
+                userMapItem.second = username;
+ 
+                // add the userMapItem to our map
+                userMapRet = userMap.insert(userMapItem);
+                if (userMapRet.second == false){
+                    printf("[ERROR: %d] username already taken\n", __LINE__);
+                    continue;                   
+                }
+        
+                break;
+
+            // remove user from userMap
             case REQ_LOGOUT:
-                //parse the logout request
-                //remove user from all channels
+                
+                // remove the user from our user map
+                ret = userMap.erase(client_STR);
+                if (ret == 0){
+                    printf("[ERROR: %d] user logout failed\n", __LINE__);
+                    continue;                   
+                }
+                
+                break;
+
             case REQ_JOIN:
-                //parse the join request
+                
+                // initialize the userAddrList
+                userAddrList.clear();
+                
+                channel = string(((request_join*)message)->req_channel); 
+
+                // find the channel, get an iterator that points to the userAddrlist associated with it
+                chanMapIt = chanMap.find(channel);
+                
+                // if the channel does not currently exist
+                if (chanMapIt == chanMap.end()){
+                
+                    // put the users addr onto the list
+                    userAddrList.push_back(client_STR);
+                    chanMapItem.first = ((request_join*) message)->req_channel;
+                    chanMapItem.second = userAddrList;
+                    
+                    // create the list, push on this user, and add that to the map
+                    chanMap.insert(chanMapItem); 
+                
+                // the channel does exist, use the iterator to add this user to the list
+                }else{
+                    (chanMapIt->second).push_back(client_STR);
+                }
+                
+                break;
+                
             case REQ_LEAVE:
+            break ;
                 //parse the leave request
             case REQ_SAY:
+
+                break;
                 //parse the say request
             case REQ_WHO:
+            
+                break;
                 //parse who request
             case REQ_LIST:
+        
+                break;
                 //parse list request
             default:
                 //send to the user that senda bad request "Server did not understand your request"
                 // do this without a helper function
                 return -1;
-        }
+
+        } // end of switch statement
 
     }// end main event loop
-  */  
+  
     // should never get to the end of the main control loop
     return 0;
+}
+
+
+struct sockaddr str2sockaddr(string input){
+    return *((sockaddr*) input.c_str());
 }
 
 //parseLogin must do two things:
