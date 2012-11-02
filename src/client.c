@@ -233,7 +233,7 @@ int main(int argc, char *argv[]){
         }   
         
         printf("\n"); // newlines absorbed in while loop above   
-        strncpy(sayBuf, inputBuf, strnlen(inputBuf, SAY_MAX));
+        strncpy(sayBuf, inputBuf, strlen(inputBuf));
     
 // (4) Parse user input
 

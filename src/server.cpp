@@ -14,6 +14,8 @@
 #include "duckchat.h"
 #include "raw.h"
 
+// c++ includes
+
 #include <iostream>
 #include <map>
 #include <cstring>
@@ -35,11 +37,16 @@ int main(int argc, char **argv){
     struct addrinfo
         hints,
         *serv,
-        *servIter;
+        *servIter
+        clientAddrInfo;
+    
+    struct sockaddr_storage
+        client;
 
 //initialize maps for users and channels
-    //TODO
-
+    map<string, list<struck sockaddr_storage> > chanMap;   // map from channel names to lists of addresses of the joined clients
+    map<struct sockaddr_storage, string>        userMap;   // map from address information of a client to their username
+    
 // (1) Check usage
 
     // make sure we have a domain and port
@@ -104,11 +111,26 @@ int main(int argc, char **argv){
     }
         
 // (3) Main server event loop
-/*    // main event loop, take packets and act on them
+    
+    // main event loop; receive packets and act on them
     while(1){
 
         //listen on the udp port
-        recvfrom();
+        recvfrom(sockfd, buf, MAXBUFLEN-1 , 0, (struct sockaddr*) &clientAddrInfo.ai_addr, &clientAddrInfo.ai_addrlen);
+        
+        // verify that they are using the correct IPV type
+        if(serv->ai_addrlen != clientAddrInfo.ai_addrlen){
+            printf("[ERROR: %d] User using incorrect IPV type\n", __LINE__);   
+            return -1;
+        }
+
+        // set up the 'address' (sockaddr_storage) to be associated with a user
+        if(serv->ai_family == AF_INET){ //ipv4
+            ((struct sockaddr_in) client).sin_family = AF_INET;
+        } else { //ipv6
+            ((struct sockaddr_in6) client)
+        }
+        
         switch (req_type){
             case REQ_LOGIN:
                 //parse the login request
