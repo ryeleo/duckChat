@@ -47,9 +47,6 @@ int main(int argc, char **argv){
         *client_SA;
     
     string
-        client_STR;
-       
-    string
         username,
         channel;
 
@@ -57,17 +54,10 @@ int main(int argc, char **argv){
         *message;
 
 //initialize maps for users and channels
-    pair<string, list<string> >    chanMapItem;
-    map<string, list<string> >                 chanMap;   // map from channel names to lists of addresses of the joined clients
-    map<string, list<string> >::iterator       chanMapIt; 
-    pair<map<string, list<string> >::iterator, bool> chanMapRet;
-
-    pair<string, string>                       userMapItem;
-    map<string, string>                        userMap;   // map from address information of a client to their username
-    map<string, string>::iterator              userMapIt;    
-    pair<map<string, string>::iterator, bool>  userMapRet; 
-
-    list<string> userAddrList;
+    list<pair<string, struct sockaddr> >::iterator userAddrIter;
+    list< pair<string, struct sockaddr> > userAddrList;
+    pair<string, struct sockaddr> userAddrItem;
+    
 
 // (1) Check usage
 
@@ -139,46 +129,75 @@ int main(int argc, char **argv){
 
         //listen on the udp port
         ret = recvfrom(sockfd, buf, TEXT_MAX, 0, (struct sockaddr*) &clientAddrInfo.ai_addr, &clientAddrInfo.ai_addrlen);
-        //TODO ERROR CHECK
+        if (ret == 0 || ret == -1){
+            printf("[ERROR] Issue during recieve from client\n");
+            continue;
+        }
 
         // copy stuff for readability
         message = (request*) buf;
+        if(message == NULL){
+            printf("[ERROR] Issue during recieve from client\n");
+            continue;
+        }
         client_SA = clientAddrInfo.ai_addr;
-        client_STR = string( (char*) clientAddrInfo.ai_addr);
+        if(client_SA == NULL){
+            printf("[ERROR] Issue during recieve from client\n");
+            continue;
+        }
         req_type = ntohl(message->req_type);
-        
+        if(req_type > 7 || req_type < 0){
+            printf("[ERROR] Issue during recieve from client\n");
+            continue;
+        }
+
         switch (req_type){
     
             // add user to userMap
             case REQ_LOGIN:
+                
+
                 // setup our userMapItem with the username
-                username = string(((request_login*) buf)->req_username);
-                userMapItem.first = client_STR;
-                userMapItem.second = username;
- 
-                // add the userMapItem to our map
-                userMapRet = userMap.insert(userMapItem);
-                if (userMapRet.second == false){
-                    printf("[ERROR: %d] username already taken\n", __LINE__);
-                    continue;                   
-                }
+                username = string(((request_login*) message)->req_username);
+                userAddrItem.first = username;
+                memcpy(&userAddrItem.second, (char*) client_SA, sizeof(client_SA));
+
+                cout << "Recieved login request from" << username << endl;
+
+                // push the userAddrItem onto the list 
+                userAddrList.push_back(userAddrItem);
         
                 break;
 
             // remove user from userMap
             case REQ_LOGOUT:
                 
-                // remove the user from our user map
-                ret = userMap.erase(client_STR);
-                if (ret == 0){
-                    printf("[ERROR: %d] user logout failed\n", __LINE__);
-                    continue;                   
+                printf("Received logout request\n");
+
+                // setup our userMapItem with the username
+                username = string(((request_login*) message)->req_username);
+                userAddrItem.first = username;
+                userAddrItem.second = *client_SA;
+
+                // find our userAddrItem in the list
+                for(userAddrIter = userAddrList.begin() ; userAddrIter != userAddrList.end() ; userAddrIter++){
+                    if(userAddrItem.first == userAddrIter->first)
+                        break;
                 }
+
+                // check that the user did exist in the list
+                if (userAddrIter == userAddrList.end()){
+                    printf("Could not log out\n");
+                    break;
+                }
+    
+                // remove the user from our user list
+                userAddrList.erase(userAddrIter);
                 
                 break;
 
             case REQ_JOIN:
-                
+               /* 
                 // initialize the userAddrList
                 userAddrList.clear();
                 
@@ -202,7 +221,7 @@ int main(int argc, char **argv){
                 }else{
                     (chanMapIt->second).push_back(client_STR);
                 }
-                
+                */
                 break;
                 
             case REQ_LEAVE:
