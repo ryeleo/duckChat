@@ -190,7 +190,7 @@ int main(int argc, char *argv[]){
                     printf("Error occurred during read from server: %s\n", strerror(errno));
                     bad_exit();
                 }
-                printf("\r");
+                printf("                                                                                                                                                                                                                       \r");
                 ret = parseServer(consoleBuf);
 #ifdef DEBUG
                 if (ret == -1)
@@ -210,12 +210,10 @@ int main(int argc, char *argv[]){
                     bad_exit();
                 }
 
-                if (i >= SAY_MAX - 1){ // if have read full amount, wait for \n
-                    continue;
-
-                }else if(inputChar == '\n'){
+                if (inputChar == '\n'){
                     break;
-
+		}else if (i >= SAY_MAX - 1){ // if have read full amount, wait for \n
+                    continue;
                 }else{
                     inputBuf[i] = inputChar;
                     printf("\r>%s",inputBuf);
@@ -232,7 +230,6 @@ int main(int argc, char *argv[]){
             }
         }   
         
-        printf("\n"); // newlines absorbed in while loop above   
         strncpy(sayBuf, inputBuf, strlen(inputBuf));
     
 // (4) Parse user input
@@ -373,7 +370,8 @@ int main(int argc, char *argv[]){
                 UNKNOWN_COMMAND:
                 // inform the client user the command is not valid
                 printf("*Unkown command\n"); 
-        
+       		printf(">");
+		fflush(NULL); 
                 // do not pack a request to send so continue
                 continue;
             }
@@ -409,7 +407,7 @@ int main(int argc, char *argv[]){
 }
 
 int parseServer(char *package){
-    unsigned int i;
+    int i;
     int txt_type = ntohl(((text*)package) -> txt_type);
     
     switch (txt_type){
