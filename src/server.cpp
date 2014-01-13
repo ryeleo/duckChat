@@ -29,8 +29,8 @@ int main(int argc, char **argv){
     int
         req_type,
         sockfd,
-        ret,
-        i;
+        ret;
+        //i;
     
     char 
         *domain,

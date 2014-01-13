@@ -407,7 +407,7 @@ int main(int argc, char *argv[]){
 }
 
 int parseServer(char *package){
-    int i;
+    unsigned int i;
     int txt_type = ntohl(((text*)package) -> txt_type);
     
     switch (txt_type){
